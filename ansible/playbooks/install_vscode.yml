@@ -1,0 +1,31 @@
+---
+- name: Install Visual Studio Code
+  hosts: employee_stations
+  become: yes
+  tasks:
+    - name: Install dependencies (Debian/Ubuntu)
+      apt:
+        name:
+          - software-properties-common
+          - apt-transport-https
+          - wget
+          - gpg
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Import Microsoft GPG key
+      shell: wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > packages.microsoft.gpg && install -D -o root -g root -m 644 packages.microsoft.gpg /etc/apt/keyrings/packages.microsoft.gpg
+      args:
+        creates: /etc/apt/keyrings/packages.microsoft.gpg
+      when: ansible_os_family == "Debian"
+
+    - name: Add VS Code repository
+      shell: echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/keyrings/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" | tee /etc/apt/sources.list.d/vscode.list
+      when: ansible_os_family == "Debian"
+
+    - name: Install VS Code
+      apt:
+        name: code
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
