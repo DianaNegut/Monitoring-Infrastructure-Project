@@ -3,7 +3,7 @@
   hosts: employee_stations
   become: yes
   vars:
-    wazuh_manager_ip: "192.168.1.100" # Replace with actual IP
+    wazuh_manager_ip: "wazuh.manager"  # Docker service name
   tasks:
     - name: Import Wazuh GPG key
       shell: curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | gpg --no-default-keyring --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg --import && chmod 644 /usr/share/keyrings/wazuh.gpg
@@ -22,11 +22,13 @@
         name: wazuh-agent
         state: present
 
-    - name: Configure Wazuh Agent
-      lineinfile:
-        path: /var/ossec/etc/ossec.conf
-        regexp: '<address>MANAGER_IP</address>'
-        line: "<address>{{ wazuh_manager_ip }}</address>"
+    - name: Deploy Wazuh Agent configuration
+      template:
+        src: ../templates/ossec.conf.j2
+        dest: /var/ossec/etc/ossec.conf
+        owner: root
+        group: wazuh
+        mode: '0640'
       notify: restart wazuh-agent
 
   handlers:
@@ -40,7 +42,7 @@
   hosts: linux_servers
   become: yes
   vars:
-    wazuh_manager_ip: "192.168.1.100"
+    wazuh_manager_ip: "wazuh.manager"  # Docker service name
   tasks:
     - name: Import Wazuh GPG key
       shell: curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | gpg --no-default-keyring --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg --import && chmod 644 /usr/share/keyrings/wazuh.gpg
@@ -59,11 +61,13 @@
         name: wazuh-agent
         state: present
 
-    - name: Configure Wazuh Agent
-      lineinfile:
-        path: /var/ossec/etc/ossec.conf
-        regexp: '<address>MANAGER_IP</address>'
-        line: "<address>{{ wazuh_manager_ip }}</address>"
+    - name: Deploy Wazuh Agent configuration
+      template:
+        src: ../templates/ossec.conf.j2
+        dest: /var/ossec/etc/ossec.conf
+        owner: root
+        group: wazuh
+        mode: '0640'
       notify: restart wazuh-agent
 
   handlers:
