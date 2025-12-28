@@ -28,7 +28,7 @@ run_playbook "update_repos.yml"
 # 2. Install Docker (Core infrastructure)
 run_playbook "install_docker.yml"
 
-# 3. Install VS Code (User tools)
+# 3. Install VS Code Server (Browser-based, works in containers)
 run_playbook "install_vscode.yml"
 
 # 4. Install Node Exporter (Monitoring)

@@ -1,0 +1,17 @@
+FROM ubuntu:22.04
+
+# Install Ansible and dependencies
+RUN apt-get update && apt-get install -y \
+    ansible \
+    sshpass \
+    openssh-client \
+    python3 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python packages for Ansible modules
+RUN pip3 install docker
+
+WORKDIR /ansible
+
+CMD ["bash"]

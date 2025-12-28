@@ -31,6 +31,22 @@ services:
     networks:
       - monitoring
 
+  ansible-control:
+    image: cytopia/ansible:latest
+    container_name: ansible-control
+    hostname: ansible-control
+    volumes:
+      - ./ansible:/ansible
+    networks:
+      - monitoring
+    depends_on:
+      - linux_server1
+      - linux_station1
+      - linux_station2
+    stdin_open: true
+    tty: true
+    command: sleep infinity
+
 networks:
   monitoring:
     external: true
