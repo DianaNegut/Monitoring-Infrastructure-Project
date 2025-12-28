@@ -47,8 +47,7 @@
           [Install]
           WantedBy=multi-user.target
 
-    - name: Start and enable Node Exporter
-      service:
-        name: node_exporter
-        state: started
-        enabled: yes
+    - name: Start Node Exporter (background process)
+      shell: nohup /usr/local/bin/node_exporter > /dev/null 2>&1 &
+      async: 10
+      poll: 0

@@ -13,10 +13,26 @@
         state: present
       when: ansible_os_family == "Debian"
 
+    - name: Remove legacy Microsoft GPG key
+      file:
+        path: /usr/share/keyrings/microsoft.gpg
+        state: absent
+
+    - name: Remove new Microsoft GPG key if exists
+      file:
+        path: /etc/apt/keyrings/packages.microsoft.gpg
+        state: absent
+
     - name: Import Microsoft GPG key
       shell: wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > packages.microsoft.gpg && install -D -o root -g root -m 644 packages.microsoft.gpg /etc/apt/keyrings/packages.microsoft.gpg
       args:
         creates: /etc/apt/keyrings/packages.microsoft.gpg
+      when: ansible_os_family == "Debian"
+
+    - name: Remove existing VS Code repository file
+      file:
+        path: /etc/apt/sources.list.d/vscode.list
+        state: absent
       when: ansible_os_family == "Debian"
 
     - name: Add VS Code repository

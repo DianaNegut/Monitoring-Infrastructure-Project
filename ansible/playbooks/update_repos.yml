@@ -9,6 +9,14 @@
         upgrade: dist
       when: ansible_os_family == "Debian"
 
+    - name: Install basic dependencies (curl, gpg)
+      apt:
+        name:
+          - curl
+          - gpg
+        state: present
+      when: ansible_os_family == "Debian"
+
     - name: Update yum packages (RHEL/CentOS)
       yum:
         name: '*'
