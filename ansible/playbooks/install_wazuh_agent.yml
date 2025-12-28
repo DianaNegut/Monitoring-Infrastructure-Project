@@ -3,7 +3,7 @@
   hosts: employee_stations
   become: yes
   vars:
-    wazuh_manager_ip: "wazuh.manager"  # Docker service name
+    wazuh_manager_ip: "wazuh.manager"
   tasks:
     - name: Import Wazuh GPG key
       shell: curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | gpg --no-default-keyring --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg --import && chmod 644 /usr/share/keyrings/wazuh.gpg
@@ -42,7 +42,7 @@
   hosts: linux_servers
   become: yes
   vars:
-    wazuh_manager_ip: "wazuh.manager"  # Docker service name
+    wazuh_manager_ip: "wazuh.manager"
   tasks:
     - name: Import Wazuh GPG key
       shell: curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | gpg --no-default-keyring --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg --import && chmod 644 /usr/share/keyrings/wazuh.gpg
