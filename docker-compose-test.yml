@@ -34,4 +34,4 @@ services:
 networks:
   monitoring:
     external: true
-    name: srpcproiect_monitoring # It must match the network created by the main docker-compose
+    name: monitoring-infrastructure-project_monitoring
