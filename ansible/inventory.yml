@@ -1,0 +1,129 @@
+all:
+
+  vars:
+    
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+    vyos_password: 'vyos'
+    ansible_python_interpreter: /usr/bin/python3
+
+  children:
+    # ========================================
+    # DMZ ZONE (10.10.20.x)
+    # Jumpbox: vyos@10.102.11.252
+    # ========================================
+    dmz_team1:
+      vars:
+        ansible_user: dmz1
+        ansible_ssh_private_key_file: ~/.ssh/sprc-dmz1
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand="sshpass -p vyos ssh -W %h:%p -o StrictHostKeyChecking=no vyos@10.102.11.252"'
+      hosts:
+        dmz-vm1-moodle-gitlab:
+          ansible_host: 10.10.20.104
+        dmz-dns:
+          ansible_host: 10.10.20.100
+
+    dmz_team2:
+      vars:
+        ansible_user: dmz2
+        ansible_ssh_private_key_file: ~/.ssh/sprc-dmz2
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand="sshpass -p vyos ssh -W %h:%p -o StrictHostKeyChecking=no vyos@10.102.11.252"'
+        ansible_become_password: 'DMZ2@SPRC2025!'
+      hosts:
+        dmz-reverse-proxy:
+          ansible_host: 10.10.20.106
+        dmz-vm2-website:
+          ansible_host: 10.10.20.105
+        dmz-vpn:
+          ansible_host: 10.10.30.111
+        dev-mgmt-ui:  # Management UI pentru DNS și DMZ Reverse Proxy
+          ansible_host: 10.10.30.100
+
+    dmz_team3:
+      vars:
+        ansible_user: dmz3
+        ansible_ssh_private_key_file: ~/.ssh/sprc-dmz3
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand="sshpass -p vyos ssh -W %h:%p -o StrictHostKeyChecking=no vyos@10.102.11.252"'
+      hosts:
+        dmz-smtp:
+          ansible_host: 10.10.20.103
+        dmz-vm3-mailcow-mattermost:
+          ansible_host: 10.10.20.101
+        dev-ldap:  # LDAP + LDAP UI în zona Development
+          ansible_host: 10.10.30.110
+
+    # ========================================
+    # DEVELOPMENT ZONE (10.10.30.x)
+    # Jumpbox: vyos@10.102.12.190
+    # ========================================
+    development:
+      vars:
+        ansible_user: dev
+        ansible_ssh_private_key_file: ~/.ssh/sprc-dev
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand="sshpass -p vyos ssh -W %h:%p -o StrictHostKeyChecking=no vyos@10.102.11.252"'
+        ansible_become_password: 'Dev@SPRC2025!'
+      hosts:
+        dev-proxy:
+          ansible_host: 10.10.30.102
+        dev-k8-master:
+          ansible_host: 10.10.30.106
+        dev-k8-worker1:
+          ansible_host: 10.10.30.101
+        dev-k8-worker2:
+          ansible_host: 10.10.30.103
+
+    # ========================================
+    # MONITORING ZONE (10.10.40.x)
+    # Jumpbox: vyos@10.102.11.252
+    # ========================================
+    monitoring:
+      vars:
+        ansible_user: ubuntu
+        ansible_ssh_private_key_file: ~/.ssh/monitoring-key.pem
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand="sshpass -p vyos ssh -W %h:%p -o StrictHostKeyChecking=no vyos@10.102.11.252"'
+      hosts:
+        mon-wazuh-ansible-grafana:
+          ansible_host: 10.10.40.141
+          description: "Wazuh + Ansible + Semaphore UI + Grafana/Zabbix + Uptime Kuma + Wazuh Bot"
+        mon-elk-splunk-arkime:
+          ansible_host: 10.10.40.214
+          description: "Arkime + ELK Stack + Splunk + ClamAV"
+        mon-snort-ids:
+          ansible_host: 10.10.40.164
+          description: "PCAP Puller + Snort + Websnort + Snort Management UI"
+    workstations:
+      vars:
+        ansible_connection: ssh
+        ansible_user: Windows
+        ansible_password: 'P@ssw0rd!'
+        ansible_ssh_pass: 'P@ssw0rd!'
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand="sshpass -p vyos ssh -W %h:%p -o StrictHostKeyChecking=no vyos@10.102.11.252"'
+          #ansible_shell_type: powershell
+          #ansible_shell_executable: None
+            #ansible_become_method: runas
+            #ansible_python_interpreter: auto_silent
+      hosts:
+        ws1:
+          ansible_host: 10.10.10.102
+        ws2:
+          ansible_host: 10.10.10.107
+        ws3:
+          ansible_host: 10.10.10.108
+        ws4:
+          ansible_host: 10.10.10.111
+    # ========================================
+    # LOGICAL GROUPINGS
+    # ========================================
+    dmz_servers:
+      children:
+        dmz_team1:
+        dmz_team2:
+        dmz_team3:
+
+    all_linux_servers:
+      children:
+        dmz_servers:
+        development:
+        monitoring:
+    all_windows_servers:
+      children:
+        workstations:

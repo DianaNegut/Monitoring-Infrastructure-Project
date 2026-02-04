@@ -1,0 +1,200 @@
+---
+# Playbook pentru instalare Docker și descărcare imagini default
+# Cerința: Creati un playbook care sa instaleze docker si sa descarce 
+#          o serie de imagini default
+
+- name: Install Docker and pull default images
+  hosts: all_linux_servers
+  become: yes
+  gather_facts: yes
+  
+  vars:
+    # Lista de imagini Docker de descărcat
+    docker_images:
+      - nginx:latest
+      - alpine:latest
+      - ubuntu:22.04
+      - postgres:latest
+      - redis:latest
+
+  tasks:
+    - name: Display target host information
+      debug:
+        msg: "Installing Docker on {{ inventory_hostname }} ({{ ansible_host }})"
+
+    # ============================================
+    # PREREQUISITE PACKAGES
+    # ============================================
+    - name: Install prerequisite packages
+      apt:
+        name:
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - apt-transport-https
+          - python3-pip
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+      register: prereq_result
+      retries: 3
+      delay: 10
+      until: prereq_result is succeeded
+
+    # ============================================
+    # ADD DOCKER GPG KEY
+    # ============================================
+    - name: Create keyrings directory
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Add Docker's official GPG key
+      shell: |
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        chmod a+r /etc/apt/keyrings/docker.gpg
+      args:
+        creates: /etc/apt/keyrings/docker.gpg
+        warn: false
+
+    # ============================================
+    # ADD DOCKER REPOSITORY
+    # ============================================
+    - name: Add Docker repository
+      shell: |
+        echo \
+          "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+          $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+      args:
+        creates: /etc/apt/sources.list.d/docker.list
+
+    - name: Update apt cache after adding Docker repo
+      apt:
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+      register: apt_update_result
+      retries: 3
+      delay: 10
+      until: apt_update_result is succeeded
+
+    # ============================================
+    # INSTALL DOCKER
+    # ============================================
+    - name: Install Docker Engine
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+        state: present
+      when: ansible_os_family == "Debian"
+      register: docker_install_result
+      retries: 2
+      delay: 15
+      until: docker_install_result is succeeded
+
+    - name: Display Docker installation result
+      debug:
+        msg: "✅ Docker installed successfully on {{ inventory_hostname }}"
+      when: docker_install_result is succeeded
+
+    # ============================================
+    # START DOCKER SERVICE
+    # ============================================
+    - name: Start Docker service
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+      register: docker_service_result
+
+    - name: Verify Docker service is running
+      command: systemctl is-active docker
+      register: docker_active
+      changed_when: false
+      failed_when: docker_active.stdout != "active"
+
+    - name: Display Docker service status
+      debug:
+        msg: "✅ Docker service is active on {{ inventory_hostname }}"
+      when: docker_active.stdout == "active"
+
+    # ============================================
+    # INSTALL PYTHON DOCKER SDK
+    # ============================================
+    - name: Install Docker SDK for Python (required by Ansible docker modules)
+      pip:
+        name: docker
+        state: present
+        executable: pip3
+      register: docker_sdk_result
+      retries: 3
+      delay: 10
+      until: docker_sdk_result is succeeded
+
+    - name: Display Docker SDK installation result
+      debug:
+        msg: "✅ Docker SDK for Python installed successfully"
+      when: docker_sdk_result is succeeded
+
+    # ============================================
+    # PULL DOCKER IMAGES
+    # ============================================
+    - name: Pull default Docker images
+      docker_image:
+        name: "{{ item }}"
+        source: pull
+        state: present
+      loop: "{{ docker_images }}"
+      register: docker_pull_result
+      retries: 3
+      delay: 10
+      until: docker_pull_result is succeeded
+
+    - name: Display pulled images
+      debug:
+        msg: "✅ Successfully pulled image: {{ item }}"
+      loop: "{{ docker_images }}"
+
+    # ============================================
+    # VERIFICATION
+    # ============================================
+    - name: Get Docker version
+      command: docker --version
+      register: docker_version
+      changed_when: false
+
+    - name: Display Docker version
+      debug:
+        msg: "{{ docker_version.stdout }}"
+
+    - name: List downloaded Docker images
+      command: docker images 
+      register: docker_images_list
+      changed_when: false
+
+    - name: Display Docker images table
+      debug:
+        msg: "{{ docker_images_list.stdout_lines }}"
+
+    # ============================================
+    # FINAL SUMMARY
+    # ============================================
+    - name: Generate installation summary
+      debug:
+        msg:
+          - "════════════════════════════════════════════"
+          - "Host: {{ inventory_hostname }} ({{ ansible_host }})"
+          - "Docker Installation: ✅ SUCCESS"
+          - "Docker Version: {{ docker_version.stdout }}"
+          - "Service Status: ACTIVE"
+          - "Python Docker SDK: INSTALLED"
+          - "Images Pulled: {{ docker_images | length }}"
+          - "  - nginx:latest"
+          - "  - alpine:latest"
+          - "  - ubuntu:22.04"
+          - "  - postgres:latest"
+          - "  - redis:latest"
+          - "════════════════════════════════════════════"

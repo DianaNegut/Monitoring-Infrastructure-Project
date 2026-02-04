@@ -12,9 +12,9 @@ run_playbook() {
     echo "------------------------------------------------------------------"
     ansible-playbook -i "$INVENTORY" "$PLAYBOOKS/$playbook"
     if [ $? -eq 0 ]; then
-        echo "✅ SUCCESS: $playbook COMPLETED"
+        echo "SUCCESS: $playbook COMPLETED"
     else
-        echo "❌ FAIL: $playbook failed"
+        echo "FAIL: $playbook failed"
     fi
     echo ""
 }

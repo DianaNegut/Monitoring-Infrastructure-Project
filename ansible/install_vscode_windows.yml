@@ -1,0 +1,75 @@
+---
+- name: Install VS Code on Windows
+  hosts: workstations
+  gather_facts: no
+
+  tasks:
+    - name: Display target host information
+      debug:
+        msg: "Installing VS Code on {{ inventory_hostname }} ({{ ansible_host }})"
+
+    - name: Create Temp directory
+      raw: if not exist C:\Temp mkdir C:\Temp
+
+    - name: Download VS Code installer (this may take 5-10 minutes)
+      raw: >
+        powershell.exe -Command 
+        "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;
+        Write-Host 'Starting download...';
+        Invoke-WebRequest 
+        -Uri 'https://code.visualstudio.com/sha/download?build=stable&os=win32-x64-user' 
+        -OutFile 'C:\Temp\VSCodeSetup.exe' 
+        -UseBasicParsing;
+        Write-Host 'Download complete'"
+      register: download_result
+
+    - name: Show download result
+      debug:
+        var: download_result.stdout_lines
+
+    - name: Verify installer was downloaded
+      raw: dir C:\Temp\VSCodeSetup.exe
+      register: installer_check
+
+    - name: Show installer info
+      debug:
+        var: installer_check.stdout_lines
+
+    - name: Install VS Code (this may take a few minutes)
+      raw: >
+        powershell.exe -Command
+        "Write-Host 'Installing VS Code...';
+        Start-Process 
+        -FilePath 'C:\Temp\VSCodeSetup.exe' 
+        -ArgumentList '/VERYSILENT', '/NORESTART', '/MERGETASKS=!runcode' 
+        -Wait;
+        Write-Host 'Installation complete'"
+      register: install_result
+
+    - name: Show install result
+      debug:
+        var: install_result.stdout_lines
+
+    - name: Wait for installation to settle
+      raw: powershell.exe -Command Start-Sleep -Seconds 5
+
+    - name: Search for VS Code executable
+      raw: >
+        powershell.exe -Command
+        "Get-ChildItem -Path 'C:\' -Recurse -Filter 'Code.exe' -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -like '*Microsoft VS Code*' } |
+        Select-Object -First 1 -ExpandProperty FullName"
+      register: vscode_location
+      ignore_errors: yes
+
+    - name: Show VS Code location
+      debug:
+        var: vscode_location.stdout_lines
+
+    - name: Installation summary
+      debug:
+        msg:
+          - "════════════════════════════════════════"
+          - "Host: {{ inventory_hostname }}"
+          - "VS Code Installation: ✅ COMPLETED"
+          - "════════════════════════════════════════"

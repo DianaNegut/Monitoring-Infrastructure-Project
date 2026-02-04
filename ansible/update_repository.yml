@@ -1,0 +1,44 @@
+---
+# Playbook pentru update repository-uri pe toate stațiile Linux
+# Cerința: Creati un playbook ansible care sa faca update la repository-uri 
+#          pentru toate statiile linux din retea
+
+- name: Update APT repositories on all Linux servers
+  hosts: all_linux_servers
+  become: yes
+  gather_facts: yes
+  
+  tasks:
+    - name: Display target host information
+      debug:
+        msg: "Updating repositories on {{ inventory_hostname }} ({{ ansible_host }})"
+    
+    - name: Update apt cache (with retries for network issues)
+      apt:
+        update_cache: yes
+        cache_valid_time: 0  # Forțează update chiar dacă cache-ul e recent
+      when: ansible_os_family == "Debian"
+      register: apt_update_result
+      retries: 3
+      delay: 10
+      until: apt_update_result is succeeded
+      ignore_errors: no
+    
+    - name: Display update result
+      debug:
+        msg: " Repository update completed successfully on {{ inventory_hostname }}"
+      when: apt_update_result is succeeded
+    
+    - name: Display error if update failed
+      debug:
+        msg: " Repository update FAILED on {{ inventory_hostname }}"
+      when: apt_update_result is failed
+    
+    - name: Generate summary of updated repositories
+      debug:
+        msg: 
+          - "Host: {{ inventory_hostname }}"
+          - "Status: {{ 'SUCCESS' if apt_update_result is succeeded else 'FAILED' }}"
+          - "OS Family: {{ ansible_os_family }}"
+          - "Distribution: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+

@@ -1,0 +1,89 @@
+---
+- name: Install Wazuh Agent on Linux Servers
+  hosts: all_linux_servers
+  become: yes
+  vars:
+    wazuh_manager_ip: "10.10.40.141"
+    wazuh_version: "4.7.0"  # Versiunea ta exactă
+    wazuh_agent_name: "{{ inventory_hostname }}"
+    
+  tasks:
+    - name: Install required packages
+      apt:
+        name:
+          - curl
+          - apt-transport-https
+          - lsb-release
+          - gnupg
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Add Wazuh GPG key
+      apt_key:
+        url: https://packages.wazuh.com/key/GPG-KEY-WAZUH
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Add Wazuh repository
+      apt_repository:
+        repo: "deb https://packages.wazuh.com/4.x/apt/ stable main"
+        state: present
+        filename: wazuh
+      when: ansible_os_family == "Debian"
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Install Wazuh agent version 4.7.0
+      environment:
+        WAZUH_MANAGER: "{{ wazuh_manager_ip }}"
+        WAZUH_AGENT_NAME: "{{ wazuh_agent_name }}"
+      apt:
+        name: "wazuh-agent={{ wazuh_version }}-*"
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Ensure Wazuh agent configuration directory exists
+      file:
+        path: /var/ossec/etc
+        state: directory
+        mode: '0750'
+
+    - name: Configure Wazuh agent - set manager IP
+      lineinfile:
+        path: /var/ossec/etc/ossec.conf
+        regexp: '<address>.*</address>'
+        line: '    <address>{{ wazuh_manager_ip }}</address>'
+        backrefs: yes
+      notify: restart wazuh-agent
+
+    - name: Enable Wazuh agent service
+      systemd:
+        name: wazuh-agent
+        enabled: yes
+        state: started
+
+    - name: Wait for agent to connect
+      wait_for:
+        timeout: 10
+      delegate_to: localhost
+
+    - name: Check Wazuh agent status
+      command: /var/ossec/bin/wazuh-control status
+      register: wazuh_status
+      changed_when: false
+      failed_when: false
+
+    - name: Display Wazuh agent status
+      debug:
+        var: wazuh_status.stdout_lines
+      when: wazuh_status.stdout_lines is defined
+
+  handlers:
+    - name: restart wazuh-agent
+      systemd:
+        name: wazuh-agent
+        state: restarted

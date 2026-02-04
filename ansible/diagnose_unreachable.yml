@@ -1,0 +1,62 @@
+---
+- name: Detailed diagnostics for all hosts
+  hosts: all_linux_servers
+  gather_facts: no
+  any_errors_fatal: false
+  
+  tasks:
+    - name: Test basic SSH connectivity with raw
+      raw: echo "Connection successful from $(hostname) at $(date)"
+      register: raw_connection
+      ignore_errors: yes
+      changed_when: false
+      timeout: 10
+    
+    - name: Show connection result
+      debug:
+        msg: |
+          Host: {{ inventory_hostname }}
+          IP: {{ ansible_host }}
+          User: {{ ansible_user }}
+          Jumpbox: {{ ansible_ssh_common_args }}
+          Status: {{ 'SUCCESS ✅' if raw_connection is succeeded else 'FAILED ❌' }}
+          {% if raw_connection is failed %}
+          Error: {{ raw_connection.msg | default('Unknown error') }}
+          {% endif %}
+      delegate_to: localhost
+    
+    - name: Test if host responds to ping from monitoring VM
+      shell: ping -c 2 -W 2 {{ ansible_host }}
+      register: ping_test
+      ignore_errors: yes
+      changed_when: false
+      delegate_to: mon-wazuh-ansible-grafana
+      when: inventory_hostname != 'mon-wazuh-ansible-grafana'
+    
+    - name: Show ping result
+      debug:
+        msg: |
+          Ping to {{ ansible_host }}: {{ 'SUCCESS ✅' if ping_test is succeeded else 'FAILED ❌' }}
+      when: 
+        - inventory_hostname != 'mon-wazuh-ansible-grafana'
+        - ping_test is defined
+
+- name: Gather detailed info from reachable hosts
+  hosts: all_linux_servers
+  gather_facts: yes
+  ignore_unreachable: yes
+  
+  tasks:
+    - name: Get system uptime and load
+      shell: |
+        echo "Uptime: $(uptime)"
+        echo "Load: $(cat /proc/loadavg)"
+        echo "Memory: $(free -h | grep Mem)"
+        echo "Disk: $(df -h / | tail -1)"
+      register: system_info
+      changed_when: false
+    
+    - name: Display system info
+      debug:
+        msg: "{{ system_info.stdout_lines }}"
+      when: system_info is defined
