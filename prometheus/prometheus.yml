@@ -1,6 +1,8 @@
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
+  external_labels:
+    monitor: 'sprc-monitoring'
 
 alerting:
   alertmanagers:
@@ -14,14 +16,46 @@ scrape_configs:
     static_configs:
       - targets: ["localhost:9090"]
 
-  - job_name: "node-exporters"
+  - job_name: "dmz-servers"
     static_configs:
       - targets:
-          - "linux_station1:9100"
-          - "linux_station2:9100"
-          - "linux_server1:9100"
+          - "10.10.20.100:9100" #dmz-dns
+          - "10.10.20.101:9100" #dmz-vm3-mailcow-mattermost
+          - "10.10.20.103:9100" #dmz-smtp
+          - "10.10.20.105:9100" #dmz-vm2-website
+          - "10.10.20.152:9100" #dmz-reverse-proxy
+          - "10.10.20.181:9100" #dmz-vm1-moodle-gitlab
         labels:
-          group: "linux-nodes"
+          team: "dmz"
+
+  - job_name: "dev-servers"
+    static_configs:
+      - targets:
+          - "10.10.30.100:9100" #dev-mgm-ui
+          - "10.10.30.102:9100" #dev-proxy
+          - "10.10.30.110:9100" #dev-ldap
+          - "10.10.30.111:9100" #dmz-vpn
+        labels:
+          team: "development"
+
+  - job_name: "kubernetes-nodes"
+    static_configs:
+      - targets:
+          - "10.10.30.106:9100" #dev-k8-master
+          - "10.10.30.104:9100" #dev-k8-worker1
+          - "10.10.30.101:9100" #dev-k8-worker2
+        labels:
+          team: "development"
+          cluster: "dev-k8s"
+
+  - job_name: "monitoring"
+    static_configs:
+      - targets:
+          - "10.10.40.141:9100" #mon-wazuh-ansible-grafana
+          - "10.10.40.214:9100" #mon-elk-splunk-arkime
+          - "10.10.40.164:9100" #mon-snort-ids
+        labels:
+          team: "monitoring"
 
   - job_name: "kubernetes-ksm"
     static_configs:
