@@ -1,0 +1,74 @@
+---
+- name: Install Wazuh Agent on Windows Workstations
+  hosts: workstations
+  gather_facts: yes
+  vars:
+    wazuh_manager_ip: "10.10.40.141"
+    wazuh_version: "4.7.0"
+    wazuh_agent_name: "{{ inventory_hostname }}"
+    wazuh_msi_url: "https://packages.wazuh.com/4.x/windows/wazuh-agent-{{ wazuh_version }}-1.msi"
+    wazuh_installer_path: "C:\\Temp\\wazuh-agent.msi"
+
+  tasks:
+    - name: Create temporary directory
+      win_file:
+        path: C:\Temp
+        state: directory
+
+    - name: Download Wazuh agent installer
+      win_get_url:
+        url: "{{ wazuh_msi_url }}"
+        dest: "{{ wazuh_installer_path }}"
+        force: no
+
+    - name: Check if Wazuh agent is already installed
+      win_service:
+        name: WazuhSvc
+      register: wazuh_service
+      failed_when: false
+
+    - name: Install Wazuh agent
+      win_package:
+        path: "{{ wazuh_installer_path }}"
+        arguments: 
+          - /q
+          - WAZUH_MANAGER="{{ wazuh_manager_ip }}"
+          - WAZUH_AGENT_NAME="{{ wazuh_agent_name }}"
+          - WAZUH_REGISTRATION_SERVER="{{ wazuh_manager_ip }}"
+        state: present
+      when: wazuh_service.exists is not defined or not wazuh_service.exists
+
+    - name: Wait for Wazuh service to be created
+      win_service:
+        name: WazuhSvc
+      register: service_check
+      until: service_check.exists
+      retries: 10
+      delay: 5
+
+    - name: Ensure Wazuh agent service is running
+      win_service:
+        name: WazuhSvc
+        state: started
+        start_mode: auto
+
+    - name: Wait for agent to connect
+      pause:
+        seconds: 15
+
+    - name: Check Wazuh agent status
+      win_shell: |
+        & "C:\Program Files (x86)\ossec-agent\wazuh-control.bat" status
+      register: wazuh_status
+      failed_when: false
+      changed_when: false
+
+    - name: Display Wazuh agent status
+      debug:
+        var: wazuh_status.stdout_lines
+      when: wazuh_status.stdout_lines is defined
+
+    - name: Clean up installer
+      win_file:
+        path: "{{ wazuh_installer_path }}"
+        state: absent
