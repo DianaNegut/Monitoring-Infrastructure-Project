@@ -2,7 +2,15 @@
 # =============================================================================
 # Playbook: Install Visual Studio Code on Windows Workstations via SSH
 # =============================================================================
+# Purpose: Install VS Code on Windows workstations using SSH
+# Method: Download on manager, SCP to workstation, install via PowerShell
+#
+# Run: ansible-playbook -i inventory.yml install_vscode_windows.yml
+# =============================================================================
 
+# =============================================================================
+# Play 1: Download VS Code installer on Manager (localhost - you're already here)
+# =============================================================================
 - name: Download VS Code Installer on Manager
   hosts: localhost
   connection: local
@@ -41,6 +49,9 @@
         msg: "{{ '✅ VS Code installer ready' if vscode_exists.stat.exists or download_result is success else '❌ Download failed' }}"
 
 
+# =============================================================================
+# Play 2: Install VS Code on Windows Workstations via SSH
+# =============================================================================
 - name: Install VS Code on Windows Workstations
   hosts: workstations
   gather_facts: no
@@ -48,8 +59,7 @@
   vars:
     packages_dir: /home/ubuntu/packages
     vscode_installer: "VSCodeUserSetup-x64.exe"
-    remote_temp_dir: "C:\\Temp"
-    local_installer_path: "C:\\Temp\\{{ vscode_installer }}"
+    local_installer_path: "C:\\Users\\Windows\\{{ vscode_installer }}"
 
   tasks:
     - name: Display host being processed
@@ -61,17 +71,13 @@
       register: vscode_check
       changed_when: false
 
-    - name: Create temp directory on Windows
-      raw: 'powershell.exe -Command "if (-not (Test-Path ''{{ remote_temp_dir }}'')) { New-Item -Path ''{{ remote_temp_dir }}'' -ItemType Directory -Force | Out-Null }"'
-      when: '"not_found" in vscode_check.stdout'
-
     - name: Copy installer to Windows workstation via SCP
       local_action: >
         shell sshpass -p '{{ ansible_password }}' scp 
         -o ProxyCommand="sshpass -p vyos ssh -W %h:%p -o StrictHostKeyChecking=no vyos@10.102.11.252"
         -o StrictHostKeyChecking=no
         {{ packages_dir }}/{{ vscode_installer }}
-        {{ ansible_user }}@{{ ansible_host }}:{{ local_installer_path }}
+        {{ ansible_user }}@{{ ansible_host }}:./{{ vscode_installer }}
       when: '"not_found" in vscode_check.stdout'
 
     - name: Install VS Code silently via PowerShell
