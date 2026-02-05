@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   semaphore:
@@ -39,7 +39,7 @@ services:
 
   # OpenSearch (replaces Wazuh Indexer for compatibility)
   wazuh.indexer:
-    image: opensearchproject/opensearch:2.11.0
+    image: wazuh/wazuh-indexer:4.7.0
     container_name: wazuh.indexer
     hostname: wazuh.indexer
     ports:
@@ -48,8 +48,6 @@ services:
       - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
       - "bootstrap.memory_lock=true"
       - "discovery.type=single-node"
-      - "DISABLE_SECURITY_PLUGIN=true"
-      - "DISABLE_INSTALL_DEMO_CONFIG=true"
     ulimits:
       memlock:
         soft: -1
@@ -58,7 +56,7 @@ services:
         soft: 65536
         hard: 65536
     volumes:
-      - wazuh-indexer-data:/usr/share/opensearch/data
+      - wazuh-indexer-data:/var/lib/wazuh-indexer
     restart: unless-stopped
     networks:
       - monitoring
@@ -73,13 +71,10 @@ services:
       - "514:514/udp"
       - "55000:55000"
     environment:
-      - INDEXER_URL=http://wazuh.indexer:9200
+      - INDEXER_URL=https://wazuh.indexer:9200
       - INDEXER_USERNAME=admin
-      - INDEXER_PASSWORD=SecretPassword
+      - INDEXER_PASSWORD=admin
       - FILEBEAT_SSL_VERIFICATION_MODE=none
-      - SSL_CERTIFICATE_AUTHORITIES=""
-      - SSL_CERTIFICATE=""
-      - SSL_KEY=""
       - DISABLE_INSTALL_DEMO_CONFIG=true
     volumes:
       - wazuh-manager-data:/var/ossec/data
@@ -97,15 +92,17 @@ services:
     container_name: wazuh.dashboard
     hostname: wazuh.dashboard
     ports:
-      - "443:5601"
+      - "5601:5601"
     environment:
+      - OPENSEARCH_HOSTS=https://wazuh.indexer:9200
+      - OPENSEARCH_SSL_VERIFICATIONMODE=none
       - INDEXER_USERNAME=admin
-      - INDEXER_PASSWORD=SecretPassword
+      - INDEXER_PASSWORD=admin
       - WAZUH_API_URL=https://wazuh.manager
       - DASHBOARD_USERNAME=kibanaserver
       - DASHBOARD_PASSWORD=kibanaserver
-      - API_USERNAME=wazuh-wui
-      - API_PASSWORD=MyS3cr37P450r.*-
+      - API_USERNAME=wazuh
+      - API_PASSWORD=wazuh
     volumes:
       - wazuh-dashboard-config:/usr/share/wazuh-dashboard/config
       - wazuh-dashboard-custom:/usr/share/wazuh-dashboard/plugins/wazuh/public/assets/custom
@@ -159,11 +156,11 @@ services:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
-      - '--web.console.templates=/usr/share/prometheus/consoles'
-      - '--web.enable-lifecycle'
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+      - "--web.enable-lifecycle"
     restart: unless-stopped
     networks:
       - monitoring
@@ -184,6 +181,20 @@ services:
     restart: unless-stopped
     depends_on:
       - prometheus
+      - loki
+    networks:
+      - monitoring
+
+  # Loki - Centralizarea Logurilor
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki-data:/loki
+    restart: unless-stopped
     networks:
       - monitoring
 
@@ -198,6 +209,9 @@ services:
     restart: unless-stopped
     networks:
       - monitoring
+    dns:
+      - 10.10.20.100
+      - 8.8.8.8
 
 networks:
   monitoring:
@@ -217,4 +231,6 @@ volumes:
   mattermost-config:
   prometheus-data:
   grafana-data:
+  loki-data:
   uptime-kuma-data:
+

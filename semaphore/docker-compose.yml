@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: semaphore-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: semaphore
+      POSTGRES_PASSWORD: semaphore_password_2025
+      POSTGRES_DB: semaphore
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - semaphore-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U semaphore"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  semaphore:
+    image: semaphoreui/semaphore:latest
+    container_name: semaphore
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      SEMAPHORE_DB_DIALECT: postgres
+      SEMAPHORE_DB_HOST: postgres
+      SEMAPHORE_DB_PORT: 5432
+      SEMAPHORE_DB_USER: semaphore
+      SEMAPHORE_DB_PASS: semaphore_password_2025
+      SEMAPHORE_DB_NAME: semaphore
+      SEMAPHORE_ADMIN_USERNAME: admin
+      SEMAPHORE_ADMIN_PASSWORD: Admin@SPRC2025!
+      SEMAPHORE_ADMIN_EMAIL: admin@sprc.mta
+      SEMAPHORE_ADMIN_NAME: "SPRC Administrator"
+      SEMAPHORE_ACCESS_KEY_ENCRYPTION: gs72mPntFATGJs9qK0pQ0rKtfidlexiMjYCH9gWKhTU=
+      SEMAPHORE_LDAP_ACTIVATED: 'no'
+      ANSIBLE_HOST_KEY_CHECKING: 'False'
+    volumes:
+      - ../ansible:/ansible:ro
+      - ./ssh_keys:/tmp/ssh_keys
+      - semaphore_data:/etc/semaphore
+      - /tmp/semaphore:/tmp/semaphore
+    networks:
+      - semaphore-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  semaphore_data:
+
+networks:
+  semaphore-network:
+    driver: bridge

@@ -18,7 +18,7 @@ all:
         ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand="sshpass -p vyos ssh -W %h:%p -o StrictHostKeyChecking=no vyos@10.102.11.252"'
       hosts:
         dmz-vm1-moodle-gitlab:
-          ansible_host: 10.10.20.104
+          ansible_host: 10.10.20.181
         dmz-dns:
           ansible_host: 10.10.20.100
 
@@ -30,7 +30,10 @@ all:
         ansible_become_password: 'DMZ2@SPRC2025!'
       hosts:
         dmz-reverse-proxy:
-          ansible_host: 10.10.20.106
+        ansible_user: ubuntu
+        ansible_ssh_pass: 'SysAdmin@SPRC2025!'
+        ansible_become_password: 'SysAdmin@SPRC2025!'
+          ansible_host: 10.10.20.152
         dmz-vm2-website:
           ansible_host: 10.10.20.105
         dmz-vpn:
@@ -67,9 +70,9 @@ all:
         dev-k8-master:
           ansible_host: 10.10.30.106
         dev-k8-worker1:
-          ansible_host: 10.10.30.101
+          ansible_host: 10.10.30.104
         dev-k8-worker2:
-          ansible_host: 10.10.30.103
+          ansible_host: 10.10.30.101
 
     # ========================================
     # MONITORING ZONE (10.10.40.x)
