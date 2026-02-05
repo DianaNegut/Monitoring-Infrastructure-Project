@@ -69,7 +69,7 @@
     - name: Wait for agent to connect
       wait_for:
         timeout: 10
-      delegate_to: localhost
+      
 
     - name: Check Wazuh agent status
       command: /var/ossec/bin/wazuh-control status

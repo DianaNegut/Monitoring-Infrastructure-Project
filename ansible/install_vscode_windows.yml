@@ -1,75 +1,121 @@
 ---
-- name: Install VS Code on Windows
+# =============================================================================
+# Play 1: Download VS Code on Management Server (has internet)
+# =============================================================================
+- name: Download VS Code Installer on Management Server
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  
+  vars:
+    local_temp_dir: "/tmp/vscode_installer"
+    vscode_installer: "VSCodeUserSetup.exe"
+    vscode_url: "https://update.code.visualstudio.com/latest/win32-x64-user/stable"
+    tags: [always] 
+  tasks:
+    - name: Create local temp directory
+      file:
+        path: "{{ local_temp_dir }}"
+        state: directory
+        mode: '0755'
+    
+    - name: Check if VS Code installer already exists locally
+      stat:
+        path: "{{ local_temp_dir }}/{{ vscode_installer }}"
+      register: local_installer
+    
+    - name: Download VS Code installer to management server
+      get_url:
+        url: "{{ vscode_url }}"
+        dest: "{{ local_temp_dir }}/{{ vscode_installer }}"
+        mode: '0644'
+      when: not local_installer.stat.exists
+      register: download_result
+    
+    - name: Display download status
+      debug:
+        msg: "{{ '✅ VS Code installer ready at ' + local_temp_dir + '/' + vscode_installer if local_installer.stat.exists or (download_result is defined and download_result is success) else '❌ Download failed' }}"
+
+
+# =============================================================================
+# Play 2: Install VS Code on Windows Workstations (offline)
+# =============================================================================
+- name: Install VS Code on Windows Workstations
   hosts: workstations
   gather_facts: no
-
+  
+  vars:
+    local_temp_dir: "/tmp/vscode_installer"
+    vscode_installer: "VSCodeUserSetup.exe"
+    remote_temp_dir: "C:\\Temp"
+    remote_installer_path: "{{ remote_temp_dir }}\\{{ vscode_installer }}"
+  
   tasks:
-    - name: Display target host information
+    - name: Display host being processed
       debug:
-        msg: "Installing VS Code on {{ inventory_hostname }} ({{ ansible_host }})"
-
-    - name: Create Temp directory
-      raw: if not exist C:\Temp mkdir C:\Temp
-
-    - name: Download VS Code installer (this may take 5-10 minutes)
-      raw: >
-        powershell.exe -Command 
-        "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;
-        Write-Host 'Starting download...';
-        Invoke-WebRequest 
-        -Uri 'https://code.visualstudio.com/sha/download?build=stable&os=win32-x64-user' 
-        -OutFile 'C:\Temp\VSCodeSetup.exe' 
-        -UseBasicParsing;
-        Write-Host 'Download complete'"
-      register: download_result
-
-    - name: Show download result
+        msg: "💻 Installing VS Code on {{ inventory_hostname }} ({{ ansible_host }})"
+    
+    - name: Create remote Temp directory
+      raw: if not exist {{ remote_temp_dir }} mkdir {{ remote_temp_dir }}
+    
+    - name: Check if VS Code is already installed
+      raw: powershell.exe -Command "if (Test-Path 'C:\Users\{{ ansible_user }}\AppData\Local\Programs\Microsoft VS Code\Code.exe') { Write-Output 'INSTALLED' } else { Write-Output 'NOT_INSTALLED' }"
+      register: vscode_check
+      changed_when: false
+    
+    - name: Show installation status
       debug:
-        var: download_result.stdout_lines
-
-    - name: Verify installer was downloaded
-      raw: dir C:\Temp\VSCodeSetup.exe
+        msg: "VS Code status: {{ 'Already installed ✅' if 'INSTALLED' in vscode_check.stdout else 'Not installed, proceeding...' }}"
+    
+    - name: Copy installer to workstation via SCP
+      shell: |
+        sshpass -p '{{ ansible_password }}' scp \
+          -o StrictHostKeyChecking=no \
+          -o UserKnownHostsFile=/dev/null \
+          -o ProxyCommand="sshpass -p vyos ssh -W %h:%p -o StrictHostKeyChecking=no vyos@10.102.11.252" \
+          {{ local_temp_dir }}/{{ vscode_installer }} \
+          {{ ansible_user }}@{{ ansible_host }}:{{ remote_temp_dir }}/{{ vscode_installer }}
+      delegate_to: localhost
+      when: "'NOT_INSTALLED' in vscode_check.stdout"
+      register: scp_result
+    
+    - name: Verify installer was copied
+      raw: dir {{ remote_temp_dir }}\{{ vscode_installer }}
       register: installer_check
-
+      when: "'NOT_INSTALLED' in vscode_check.stdout"
+    
     - name: Show installer info
       debug:
         var: installer_check.stdout_lines
-
+      when: "'NOT_INSTALLED' in vscode_check.stdout"
+    
     - name: Install VS Code (this may take a few minutes)
-      raw: >
-        powershell.exe -Command
-        "Write-Host 'Installing VS Code...';
-        Start-Process 
-        -FilePath 'C:\Temp\VSCodeSetup.exe' 
-        -ArgumentList '/VERYSILENT', '/NORESTART', '/MERGETASKS=!runcode' 
-        -Wait;
-        Write-Host 'Installation complete'"
+      raw: powershell.exe -Command "Write-Host 'Installing VS Code...'; Start-Process -FilePath '{{ remote_installer_path }}' -ArgumentList '/VERYSILENT', '/NORESTART', '/MERGETASKS=!runcode,addcontextmenufiles,addcontextmenufolders,associatewithfiles,addtopath' -Wait; Write-Host 'Installation complete'"
       register: install_result
-
+      when: "'NOT_INSTALLED' in vscode_check.stdout"
+    
     - name: Show install result
       debug:
         var: install_result.stdout_lines
-
+      when: "'NOT_INSTALLED' in vscode_check.stdout"
+    
     - name: Wait for installation to settle
       raw: powershell.exe -Command Start-Sleep -Seconds 5
-
-    - name: Search for VS Code executable
-      raw: >
-        powershell.exe -Command
-        "Get-ChildItem -Path 'C:\' -Recurse -Filter 'Code.exe' -ErrorAction SilentlyContinue |
-        Where-Object { $_.FullName -like '*Microsoft VS Code*' } |
-        Select-Object -First 1 -ExpandProperty FullName"
-      register: vscode_location
+      when: "'NOT_INSTALLED' in vscode_check.stdout"
+    
+    - name: Cleanup installer
+      raw: powershell.exe -Command "Remove-Item '{{ remote_installer_path }}' -Force -ErrorAction SilentlyContinue"
+      when: "'NOT_INSTALLED' in vscode_check.stdout"
       ignore_errors: yes
-
-    - name: Show VS Code location
-      debug:
-        var: vscode_location.stdout_lines
-
+    
+    - name: Verify final installation
+      raw: powershell.exe -Command "if (Test-Path 'C:\Users\{{ ansible_user }}\AppData\Local\Programs\Microsoft VS Code\Code.exe') { Write-Output 'SUCCESS' } else { Write-Output 'FAILED' }"
+      register: vscode_verify
+    
     - name: Installation summary
       debug:
         msg:
           - "════════════════════════════════════════"
           - "Host: {{ inventory_hostname }}"
-          - "VS Code Installation: ✅ COMPLETED"
+          - "VS Code Installation: {{ '✅ SUCCESS' if 'SUCCESS' in vscode_verify.stdout else '❌ FAILED' }}"
           - "════════════════════════════════════════"

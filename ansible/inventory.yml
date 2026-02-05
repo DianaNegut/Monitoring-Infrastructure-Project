@@ -1,7 +1,5 @@
 all:
-
   vars:
-    
     ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
     vyos_password: 'vyos'
     ansible_python_interpreter: /usr/bin/python3
@@ -30,15 +28,15 @@ all:
         ansible_become_password: 'DMZ2@SPRC2025!'
       hosts:
         dmz-reverse-proxy:
-        ansible_user: ubuntu
-        ansible_ssh_pass: 'SysAdmin@SPRC2025!'
-        ansible_become_password: 'SysAdmin@SPRC2025!'
           ansible_host: 10.10.20.152
+          ansible_user: ubuntu
+          ansible_ssh_pass: 'SysAdmin@SPRC2025!'
+          ansible_become_password: 'SysAdmin@SPRC2025!'
         dmz-vm2-website:
           ansible_host: 10.10.20.105
         dmz-vpn:
           ansible_host: 10.10.30.111
-        dev-mgmt-ui:  # Management UI pentru DNS și DMZ Reverse Proxy
+        dev-mgmt-ui:
           ansible_host: 10.10.30.100
 
     dmz_team3:
@@ -51,7 +49,7 @@ all:
           ansible_host: 10.10.20.103
         dmz-vm3-mailcow-mattermost:
           ansible_host: 10.10.20.101
-        dev-ldap:  # LDAP + LDAP UI în zona Development
+        dev-ldap:
           ansible_host: 10.10.30.110
 
     # ========================================
@@ -93,6 +91,10 @@ all:
         mon-snort-ids:
           ansible_host: 10.10.40.164
           description: "PCAP Puller + Snort + Websnort + Snort Management UI"
+
+    # ========================================
+    # WORKSTATIONS (10.10.10.x)
+    # ========================================
     workstations:
       vars:
         ansible_connection: ssh
@@ -100,10 +102,6 @@ all:
         ansible_password: 'P@ssw0rd!'
         ansible_ssh_pass: 'P@ssw0rd!'
         ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand="sshpass -p vyos ssh -W %h:%p -o StrictHostKeyChecking=no vyos@10.102.11.252"'
-          #ansible_shell_type: powershell
-          #ansible_shell_executable: None
-            #ansible_become_method: runas
-            #ansible_python_interpreter: auto_silent
       hosts:
         ws1:
           ansible_host: 10.10.10.102
@@ -113,6 +111,7 @@ all:
           ansible_host: 10.10.10.108
         ws4:
           ansible_host: 10.10.10.111
+
     # ========================================
     # LOGICAL GROUPINGS
     # ========================================
@@ -127,6 +126,7 @@ all:
         dmz_servers:
         development:
         monitoring:
+
     all_windows_servers:
       children:
         workstations:
