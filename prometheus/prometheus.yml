@@ -2,7 +2,7 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
   external_labels:
-    monitor: 'sprc-monitoring'
+    monitor: "sprc-monitoring"
 
 alerting:
   alertmanagers:
@@ -60,4 +60,3 @@ scrape_configs:
   - job_name: "kubernetes-ksm"
     static_configs:
       - targets: ["10.10.30.106:30082"]
-
