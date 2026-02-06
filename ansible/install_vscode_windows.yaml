@@ -67,11 +67,11 @@
 
     - name: Copy installer to Windows workstation via SCP
       local_action: >
-        shell sshpass -p '{{ ansible_password }}' scp 
+        shell sshpass -p '{{ ansible_password }}' scp
         -o ProxyCommand="sshpass -p vyos ssh -W %h:%p -o StrictHostKeyChecking=no vyos@10.102.11.252"
         -o StrictHostKeyChecking=no
-        {{ packages_dir }}/{{ vscode_installer }}
-        {{ ansible_user }}@{{ ansible_host }}:{{ local_installer_path }}
+        "{{ packages_dir }}/{{ vscode_installer }}"
+        "{{ ansible_user }}@{{ ansible_host }}:/C:/Temp/{{ vscode_installer }}"
       when: '"already_installed" not in vscode_check.stdout'
 
     - name: Install VS Code silently
