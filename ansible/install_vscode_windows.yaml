@@ -65,14 +65,12 @@
       raw: 'powershell.exe -Command "if (-not (Test-Path ''{{ remote_temp_dir }}'')) { New-Item -Path ''{{ remote_temp_dir }}'' -ItemType Directory -Force | Out-Null }"'
       when: '"already_installed" not in vscode_check.stdout'
 
-    - name: Copy installer to Windows workstation via SCP
-      local_action: >
-        shell sshpass -p '{{ ansible_password }}' scp
-        -o ProxyCommand="sshpass -p vyos ssh -W %h:%p -o StrictHostKeyChecking=no vyos@10.102.11.252"
-        -o StrictHostKeyChecking=no
-        "{{ packages_dir }}/{{ vscode_installer }}"
-        "{{ ansible_user }}@{{ ansible_host }}:/C:/Temp/{{ vscode_installer }}"
+    - name: Copy installer to Windows workstation
+      copy:
+        src: "{{ packages_dir }}/{{ vscode_installer }}"
+        dest: "{{ remote_temp_dir }}\\"
       when: '"already_installed" not in vscode_check.stdout'
+      timeout: 1200
 
     - name: Install VS Code silently
       raw: 'powershell.exe -Command "Start-Process -FilePath ''{{ local_installer_path }}'' -ArgumentList ''/VERYSILENT'',''/NORESTART'',''/MERGETASKS=!runcode,addcontextmenufiles,addcontextmenufolders,associatewithfiles,addtopath'' -Wait"'

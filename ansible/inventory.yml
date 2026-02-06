@@ -107,7 +107,7 @@ all:
         ansible_password: 'P@ssw0rd!'
           #ansible_password: 'P@ssw0rd!'
         ansible_ssh_pass: 'P@ssw0rd!'
-        ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand="sshpass -p vyos ssh -W %h:%p -o StrictHostKeyChecking=no vyos@10.102.11.252"'
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=30 -o ServerAliveCountMax=10 -o ProxyCommand="sshpass -p vyos ssh -W %h:%p -o StrictHostKeyChecking=no vyos@10.102.11.252"'
       hosts:
         ws1:
           ansible_host: 10.10.10.102
