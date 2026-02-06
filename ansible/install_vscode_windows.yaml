@@ -6,12 +6,13 @@
 - name: Download VS Code Installer on Manager
   hosts: localhost
   connection: local
-  gather_facts: yes
+  gather_facts: no
 
   vars:
-    packages_dir: /home/ubuntu/packages
-    vscode_installer: "VSCodeUserSetup-x64.exe"
-    vscode_url: "https://code.visualstudio.com/sha/download?build=stable&os=win32-x64-user"
+    packages_dir: "/home/ubuntu/packages"
+    # System Installer is better for automated deployments (to Program Files)
+    vscode_installer: "VSCodeSystemSetup-x64.exe"
+    vscode_url: "https://code.visualstudio.com/sha/download?build=stable&os=win32-x64"
 
   tasks:
     - name: Create packages directory
@@ -20,24 +21,21 @@
         state: directory
         mode: '0755'
 
-    - name: Check if VS Code is already installed
-      raw: 'powershell.exe -Command "if ((Get-Command code -ErrorAction SilentlyContinue) -or (Test-Path ''C:\Users\{{ ansible_user }}\AppData\Local\Programs\Microsoft VS Code\Code.exe'')) { Write-Host ''exists'' } else { Write-Host ''not_found'' }"'
-      register: vscode_check
+    - name: Check if installer already exists
+      stat:
+        path: "{{ packages_dir }}/{{ vscode_installer }}"
+      register: installer_stat
 
-    - name: Download VS Code installer
+    - name: Download VS Code system installer
       get_url:
         url: "{{ vscode_url }}"
         dest: "{{ packages_dir }}/{{ vscode_installer }}"
         mode: '0644'
-      when: not vscode_exists.stat.exists
+      when: not installer_stat.stat.exists
       register: download_result
       retries: 3
       delay: 5
       until: download_result is success
-
-    - name: Display download status
-      debug:
-        msg: "{{ '✅ VS Code installer ready' if vscode_exists.stat.exists or download_result is success else '❌ Download failed' }}"
 
 
 - name: Install VS Code on Windows Workstations
@@ -45,10 +43,13 @@
   gather_facts: no
 
   vars:
-    packages_dir: /home/ubuntu/packages
-    vscode_installer: "VSCodeUserSetup-x64.exe"
+    # IMPORTANT: Ensure this matches the installer downloaded above
+    packages_dir: "/home/ubuntu/packages"
+    vscode_installer: "VSCodeSystemSetup-x64.exe"
     remote_temp_dir: "C:\\Temp"
     local_installer_path: "C:\\Temp\\{{ vscode_installer }}"
+    # Standard path for System Installation
+    vscode_exe_path: "C:\\Program Files\\Microsoft VS Code\\Code.exe"
 
   tasks:
     - name: Display host being processed
@@ -56,13 +57,13 @@
         msg: "💻 Installing VS Code on {{ inventory_hostname }} ({{ ansible_host }})"
 
     - name: Check if VS Code is already installed
-      raw: 'powershell.exe -Command "if (Test-Path ''C:\Users\{{ ansible_user }}\AppData\Local\Programs\Microsoft VS Code\Code.exe'') { Write-Host ''exists'' } else { Write-Host ''not_found'' }"'
+      raw: 'powershell.exe -Command "if (Test-Path ''{{ vscode_exe_path }}'') { Write-Host ''already_installed'' } else { Write-Host ''not_found'' }"'
       register: vscode_check
       changed_when: false
 
     - name: Create temp directory on Windows
       raw: 'powershell.exe -Command "if (-not (Test-Path ''{{ remote_temp_dir }}'')) { New-Item -Path ''{{ remote_temp_dir }}'' -ItemType Directory -Force | Out-Null }"'
-      when: '"not_found" in vscode_check.stdout'
+      when: '"already_installed" not in vscode_check.stdout'
 
     - name: Copy installer to Windows workstation via SCP
       local_action: >
@@ -71,25 +72,23 @@
         -o StrictHostKeyChecking=no
         {{ packages_dir }}/{{ vscode_installer }}
         {{ ansible_user }}@{{ ansible_host }}:{{ local_installer_path }}
-      when: '"not_found" in vscode_check.stdout'
+      when: '"already_installed" not in vscode_check.stdout'
 
-    - name: Install VS Code silently via PowerShell
+    - name: Install VS Code silently
       raw: 'powershell.exe -Command "Start-Process -FilePath ''{{ local_installer_path }}'' -ArgumentList ''/VERYSILENT'',''/NORESTART'',''/MERGETASKS=!runcode,addcontextmenufiles,addcontextmenufolders,associatewithfiles,addtopath'' -Wait"'
-      when: '"not_found" in vscode_check.stdout'
+      when: '"already_installed" not in vscode_check.stdout'
 
     - name: Cleanup installer
       raw: 'powershell.exe -Command "Remove-Item -Path ''{{ local_installer_path }}'' -Force -ErrorAction SilentlyContinue"'
+      when: '"already_installed" not in vscode_check.stdout'
 
     - name: Verify installation
-      raw: 'powershell.exe -Command "if (Test-Path ''C:\Users\{{ ansible_user }}\AppData\Local\Programs\Microsoft VS Code\Code.exe'') { Write-Host ''SUCCESS'' } else { Write-Host ''FAILED'' }"'
+      raw: 'powershell.exe -Command "if (Test-Path ''{{ vscode_exe_path }}'') { Write-Host ''SUCCESS'' } else { Write-Host ''FAILED'' }"'
       register: vscode_verify
       changed_when: false
 
-    - name: Debug Verify Output
-      debug:
-        var: vscode_verify.stdout
-        
     - name: Display result
       debug:
         msg: "{{ '✅ SUCCESS' if 'SUCCESS' in vscode_verify.stdout else '❌ FAILED' }}: {{ inventory_hostname }}"
+
 
